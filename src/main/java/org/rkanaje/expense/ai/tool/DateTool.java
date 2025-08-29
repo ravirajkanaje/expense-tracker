@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -20,10 +20,9 @@ public class DateTool {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Tool(name = "getDate",
-            description = "Get the current date. Returns a string in the format 'yyyy-MM-dd'.")
+            description = "Get the current date in UTC timezone. Returns a string in the format 'yyyy-MM-dd'.")
     public String getDate() {
-        LocalDate currentDate = LocalDate.now();
-        return currentDate.format(DATE_FORMATTER);
+        return LocalDate.now(ZoneOffset.UTC).format(DATE_FORMATTER);
     }
 
 
