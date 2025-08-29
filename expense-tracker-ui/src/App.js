@@ -23,6 +23,11 @@ const Icons = {
     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
     </svg>
+  ),
+  Refresh: ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
   )
 };
 
@@ -138,9 +143,7 @@ function App() {
       }
 
       const data = await response.json();
-      // Extract the message field from the response
-      const message = data.message || data.response || 'No message found in response';
-      setResponse(message);
+      setResponse(data.message || 'No message found in response');
     } catch (err) {
       setError(`Error: ${err.message}`);
     } finally {
@@ -205,8 +208,7 @@ function App() {
               )}
 
               {response && (
-                <div className="response">
-                  
+                <div className="p-4 rounded-lg mb-4 bg-blue-100 border border-blue-400 text-blue-700">
                   <div className="response-content">
                     {response}
                   </div>
@@ -223,13 +225,13 @@ function App() {
                                  <div>
                    <h1 className="text-2xl font-semibold text-gray-900">Expense History</h1>
                  </div>
-                                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                   <div className="relative w-full sm:w-auto">
+                                 <div className="flex items-center gap-2">
+                  <div className="relative w-40">
                     <select
                       id="period-select"
                       value={selectedPeriod}
                       onChange={(e) => setSelectedPeriod(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                      className="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                       disabled={expensesLoading}
                     >
                       {timeOptions.map(option => (
@@ -244,6 +246,14 @@ function App() {
                       </svg>
                     </div>
                   </div>
+                  <button
+                    onClick={() => fetchExpenses(selectedPeriod)}
+                    disabled={expensesLoading}
+                    className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh expenses"
+                  >
+                    <Icons.Refresh className={`w-5 h-5 ${expensesLoading ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -286,10 +296,18 @@ function App() {
                       {expenses.map((expense, index) => {
                         const amount = parseFloat(expense.amount || expense.value || 0);
                         const isExpense = amount < 0;
-                        const date = new Date(expense.date || expense.timestamp);
+                        // Parse date string in YYYY-MM-DD format and create a UTC date
+                        const parseDate = (dateStr) => {
+                          if (!dateStr) return new Date(NaN);
+                          const [year, month, day] = dateStr.split('-').map(Number);
+                          return new Date(Date.UTC(year, month - 1, day));
+                        };
+                        
+                        const date = parseDate(expense.date || expense.timestamp);
                         const formattedDate = isNaN(date.getTime()) 
                           ? 'N/A' 
                           : date.toLocaleDateString('en-US', { 
+                              timeZone: 'UTC',
                               month: 'short', 
                               day: 'numeric',
                               year: 'numeric'

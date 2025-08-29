@@ -210,32 +210,68 @@ public class GoogleSheetsTool {
     }
 
     private String updateYearSheet(String sheetName, List<Expense> expenses) throws IOException {
-        // Get the current data to find the next empty row
+        if (expenses == null || expenses.isEmpty()) {
+            return "No expenses to update";
+        }
+
+        // Get all existing data
         ValueRange response = sheetsService.spreadsheets().values()
                 .get(spreadsheetId, sheetName + "!" + RANGE)
                 .execute();
 
         List<List<Object>> values = response.getValues();
-        int nextRow = (values != null && !values.isEmpty()) ? values.size() + 1 : 2; // +1 for header row
-
-        // Prepare the new rows of data
-        List<List<Object>> newRows = new ArrayList<>();
-        for (Expense expense : expenses) {
-            newRows.add(createRowData(expense));
+        if (values == null || values.isEmpty()) {
+            values = new ArrayList<>();
+            values.add(HEADER_ROW); // Add header if sheet is empty
         }
 
-        // Update the sheet
-        ValueRange body = new ValueRange()
-                .setValues(newRows);
+        // Create a map of existing expenses for quick lookup (date|topic -> row index)
+        Map<String, Integer> existingExpenses = new HashMap<>();
+        for (int i = 1; i < values.size(); i++) {
+            List<Object> row = values.get(i);
+            if (row.size() >= 3) { // Ensure we have date, amount, and topic
+                String date = row.get(0).toString();
+                String topic = row.get(2).toString().toLowerCase();
+                existingExpenses.put(date + "|" + topic, i);
+            }
+        }
 
-        String updateRange = String.format("%s!A%d:C", sheetName, nextRow);
-        UpdateValuesResponse result = sheetsService.spreadsheets().values()
-                .update(spreadsheetId, updateRange, body)
-                .setValueInputOption("USER_ENTERED")
+        int updatedCount = 0;
+        int addedCount = 0;
+
+        // Process each expense to add/update
+        for (Expense expense : expenses) {
+            String key = expense.getDate() + "|" + expense.getTopic().toLowerCase();
+            List<Object> newRow = createRowData(expense);
+
+            if (existingExpenses.containsKey(key)) {
+                // Update existing row
+                int rowIndex = existingExpenses.get(key);
+                values.set(rowIndex, newRow);
+                updatedCount++;
+            } else {
+                // Add new row
+                values.add(newRow);
+                addedCount++;
+            }
+        }
+
+        // Clear the sheet and write back all rows
+        sheetsService.spreadsheets().values()
+                .clear(spreadsheetId, sheetName + "!" + RANGE, new ClearValuesRequest())
                 .execute();
 
-        log.info("Updated {} rows in sheet {}", result.getUpdatedRows(), sheetName);
-        return String.format("Added %d expenses to %s", expenses.size(), sheetName);
+        // Only write back if we have data
+        if (!values.isEmpty()) {
+            ValueRange body = new ValueRange().setValues(values);
+            sheetsService.spreadsheets().values()
+                    .update(spreadsheetId, sheetName + "!A1", body)
+                    .setValueInputOption("USER_ENTERED")
+                    .execute();
+        }
+
+        log.info("Updated sheet {}: {} updated, {} added", sheetName, updatedCount, addedCount);
+        return String.format("Updated %d and added %d expenses in %s", updatedCount, addedCount, sheetName);
     }
 
     /**
@@ -244,9 +280,18 @@ public class GoogleSheetsTool {
     private List<Object> createRowData(Expense expense) {
         List<Object> row = new ArrayList<>();
         // Format: Date, Amount, Description
-        row.add(expense.getDate() != null ? expense.getDate() : LocalDate.now().format(DATE_FORMATTER));
-        row.add(expense.getAmount());
-        row.add(expense.getTopic());
+        try {
+            // Ensure date is properly formatted
+            String formattedDate = expense.getDate() != null 
+                ? LocalDate.parse(expense.getDate()).format(DATE_FORMATTER)
+                : LocalDate.now().format(DATE_FORMATTER);
+            row.add(formattedDate);
+            row.add(expense.getAmount());
+            row.add(expense.getTopic());
+        } catch (Exception e) {
+            log.error("Error formatting expense data: {}", expense, e);
+            throw new IllegalArgumentException("Invalid expense data format");
+        }
         return row;
     }
 

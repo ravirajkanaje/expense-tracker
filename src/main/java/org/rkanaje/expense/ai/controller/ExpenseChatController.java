@@ -33,11 +33,16 @@ public class ExpenseChatController {
             consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ChatOutput> chatPost(@RequestBody @NonNull ChatInput input) {
         try {
-            return ResponseEntity.ok().body(ChatOutput.builder().message(expenseChatService.processChatMessage(input.getMessage()))
+            String message = expenseChatService.processChatMessage(input.getMessage());
+            return ResponseEntity.ok().body(ChatOutput.builder()
+                    .message(message)
                     .build());
         } catch (Exception e) {
-            log.error(e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            log.error("Error processing chat message: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ChatOutput.builder()
+                            .message("Sorry, I encountered an error processing your request.")
+                            .build());
         }
     }
 

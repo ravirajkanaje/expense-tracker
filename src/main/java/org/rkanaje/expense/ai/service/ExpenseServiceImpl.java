@@ -8,7 +8,6 @@ import org.rkanaje.expense.ai.model.Expense;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
